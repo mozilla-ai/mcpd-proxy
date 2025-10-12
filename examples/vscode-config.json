@@ -1,0 +1,13 @@
+{
+  "servers": {
+    "mcpd": {
+      "type": "stdio",
+      "command": "node",
+      "args": ["<path-to-mcpd-proxy>/dist/index.js"],
+      "env": {
+        "MCPD_ADDR": "http://localhost:8090"
+      }
+    }
+  },
+  "inputs": []
+}
