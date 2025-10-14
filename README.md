@@ -26,14 +26,27 @@ An MCP (Model Context Protocol) server that acts as a proxy between IDEs and the
 
 ## Prerequisites
 
-- `Node.js` 18 or higher
+- `Node.js` 22 or higher
 - `mcpd` daemon running and accessible
 - `mcpd` SDK (automatically installed as a dependency)
 
 ## Installation
 
+### From npm (Recommended)
+
 ```bash
-# Clone or navigate to the project directory
+# Global installation
+npm install -g @mozilla-ai/mcpd-proxy
+
+# Or use directly with npx
+npx @mozilla-ai/mcpd-proxy
+```
+
+### From Source
+
+```bash
+# Clone the repository
+git clone https://github.com/mozilla-ai/mcpd-proxy.git
 cd mcpd-proxy
 
 # Install dependencies
@@ -57,23 +70,23 @@ npm run build
 ### Running Directly
 
 ```bash
-# With default configuration
-node dist/index.js
+# Using npm package (recommended)
+npx @mozilla-ai/mcpd-proxy
 
 # With custom mcpd address
-MCPD_ADDR=http://localhost:8090 node dist/index.js
+MCPD_ADDR=http://localhost:8090 npx @mozilla-ai/mcpd-proxy
 
 # With API key
-MCPD_ADDR=http://localhost:8090 MCPD_API_KEY=your-key node dist/index.js
+MCPD_ADDR=http://localhost:8090 MCPD_API_KEY=your-key npx @mozilla-ai/mcpd-proxy
+
+# From source build
+node dist/index.mjs
+
+# From source with custom address
+MCPD_ADDR=http://localhost:8090 node dist/index.mjs
 ```
 
 ### VS Code Setup
-
-Build the project:
-
-```bash
-npm run build
-```
 
 Add to your VS Code MCP settings file (location varies by platform):
 
@@ -82,8 +95,25 @@ Add to your VS Code MCP settings file (location varies by platform):
   "servers": {
     "mcpd": {
       "type": "stdio",
+      "command": "npx",
+      "args": ["@mozilla-ai/mcpd-proxy"],
+      "env": {
+        "MCPD_ADDR": "http://localhost:8090"
+      }
+    }
+  }
+}
+```
+
+Or if building from source:
+
+```json
+{
+  "servers": {
+    "mcpd": {
+      "type": "stdio",
       "command": "node",
-      "args": ["<path-to-mcpd-proxy>/dist/index.js"],
+      "args": ["<path-to-mcpd-proxy>/dist/index.mjs"],
       "env": {
         "MCPD_ADDR": "http://localhost:8090"
       }
@@ -100,20 +130,30 @@ Verify the connection in the MCP panel to see available tools.
 
 ### Cursor Setup
 
-Build the project:
-
-```bash
-npm run build
-```
-
 Create or edit `.cursor/mcp.json` in your project directory, or `~/.cursor/mcp.json` for global configuration:
 
 ```json
 {
   "mcpServers": {
     "mcpd": {
+      "command": "npx",
+      "args": ["@mozilla-ai/mcpd-proxy"],
+      "env": {
+        "MCPD_ADDR": "http://localhost:8090"
+      }
+    }
+  }
+}
+```
+
+Or if building from source:
+
+```json
+{
+  "mcpServers": {
+    "mcpd": {
       "command": "node",
-      "args": ["<path-to-mcpd-proxy>/dist/index.js"],
+      "args": ["<path-to-mcpd-proxy>/dist/index.mjs"],
       "env": {
         "MCPD_ADDR": "http://localhost:8090"
       }
@@ -126,6 +166,8 @@ Replace `<path-to-mcpd-proxy>` with the absolute path to your installation, or u
 
 Reload Cursor to apply the configuration.
 
+See `examples/` folder for configuration examples.
+
 ## Development
 
 ### Project Structure
@@ -137,15 +179,27 @@ mcpd-proxy/
 │   ├── server.ts              # MCP server implementation
 │   ├── config.ts              # Configuration loader
 │   └── apiPaths.ts            # API endpoint constants
-├── dist/                      # Build output (gitignored)
+├── tests/
+│   └── unit/                  # Unit test files
+│       ├── apiPaths.test.ts
+│       ├── config.test.ts
+│       └── parsers.test.ts
+├── .github/
+│   └── workflows/             # GitHub Actions workflows
+│       ├── tests.yaml
+│       ├── lint.yaml
+│       └── release.yaml
 ├── examples/
 │   ├── vscode-config.json     # VS Code configuration example
 │   └── cursor-config.json     # Cursor configuration example
+├── dist/                      # Build output (gitignored)
 ├── package.json               # npm package configuration
 ├── package-lock.json          # npm dependency lock file
 ├── tsconfig.json              # TypeScript compiler configuration
+├── tsconfig.test.json         # TypeScript test configuration
+├── vitest.config.ts           # Vitest test configuration
+├── vite.config.mts            # Vite build configuration
 ├── eslint.config.mts          # ESLint configuration
-├── .prettierrc                # Prettier code formatter config
 ├── .prettierignore            # Prettier ignore patterns
 ├── .gitignore                 # Git ignore patterns
 └── README.md                  # This file
@@ -161,10 +215,22 @@ npm install
 npm run build
 
 # Watch mode (auto-rebuild on changes)
-npm run watch
+npm run dev
+
+# Run tests
+npm test
+
+# Run tests in watch mode
+npm run test:watch
 
 # Type check without building
 npm run typecheck
+
+# Lint code
+npm run lint
+
+# Format code
+npm run format
 ```
 
 ### Manual Testing
@@ -173,10 +239,10 @@ Test the MCP protocol directly using `JSON-RPC` over `stdio`:
 
 ```bash
 # Test initialize
-echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"test","version":"1.0.0"}}}' | node dist/index.js
+echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"test","version":"1.0.0"}}}' | node dist/index.mjs
 
 # Test list tools
-echo '{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}' | node dist/index.js
+echo '{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}' | node dist/index.mjs
 ```
 
 ## Naming Conventions
@@ -267,7 +333,7 @@ Cause: VS Code may not have recognized the MCP server
 Solution:
 
 1. Check VS Code developer console for errors (Help → Toggle Developer Tools)
-2. Verify the path to `dist/index.js` is correct and absolute
+2. Verify the path to `dist/index.mjs` is correct and absolute (if building from source)
 3. Reload VS Code: `Cmd+Shift+P` → "Developer: Reload Window"
 4. Check `mcpd` daemon is running and accessible
 
@@ -302,8 +368,6 @@ API key: not set
 - Dynamic tool list updates (`notifications/tools/list_changed`)
 - Server filtering via `MCPD_SERVERS` environment variable
 - Improved unhealthy server handling
-- Comprehensive test suite
-- Publish to `npm` for `npx` usage
 
 ## Related Projects
 
