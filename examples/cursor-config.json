@@ -2,8 +2,8 @@
   "mcpServers": {
     "mcpd-proxy": {
       "type": "stdio",
-      "command": "node",
-      "args": ["<path-to-mcpd-proxy>/dist/index.js"],
+      "command": "npx",
+      "args": ["@mozilla-ai/mcpd-proxy"],
       "env": {
         "MCPD_ADDR": "http://localhost:8090"
       }
