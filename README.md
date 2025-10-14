@@ -47,10 +47,10 @@ npm run build
 
 `mcpd-proxy` is configured via environment variables:
 
-| Variable       | Description                              | Default                 |
-| -------------- | ---------------------------------------- | ----------------------- |
-| `MCPD_ADDR`    | `mcpd` daemon address                    | `http://localhost:8090` |
-| `MCPD_API_KEY` | Optional API key for `mcpd` authentication | _(not set)_           |
+| Variable       | Description                                | Default                 |
+| -------------- | ------------------------------------------ | ----------------------- |
+| `MCPD_ADDR`    | `mcpd` daemon address                      | `http://localhost:8090` |
+| `MCPD_API_KEY` | Optional API key for `mcpd` authentication | _(not set)_             |
 
 ## Usage
 
@@ -186,6 +186,7 @@ echo '{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}' | node dist/in
 Tools are exposed with the format: `{server}__{tool_name}`
 
 Examples:
+
 - `time__get_current_time` - `get_current_time` tool from `time` server
 - `github__create_issue` - `create_issue` tool from `github` server
 - `fetch__get_url` - `get_url` tool from `fetch` server
@@ -197,6 +198,7 @@ This naming convention prevents tool name collisions between servers and makes i
 Resources use a custom URI scheme: `mcpd://{server}/{resource_uri}`
 
 Examples:
+
 - `mcpd://filesystem/documents/file.txt`
 - `mcpd://database/users/123`
 
@@ -243,6 +245,7 @@ The proxy implements the following MCP protocol handlers:
 Cause: `mcpd` daemon is not running or not accessible
 
 Solution:
+
 1. Verify `mcpd` is running: `curl http://localhost:8090/api/v1/servers`
 2. Check `MCPD_ADDR` environment variable is correct
 3. Ensure no firewall blocking the connection
@@ -252,6 +255,7 @@ Solution:
 Cause: Requested server doesn't exist in `mcpd`
 
 Solution:
+
 1. List available servers: `curl http://localhost:8090/api/v1/servers`
 2. Check server is configured in `mcpd`
 3. Verify server is healthy: `curl http://localhost:8090/api/v1/health/servers/<server-name>`
@@ -261,6 +265,7 @@ Solution:
 Cause: VS Code may not have recognized the MCP server
 
 Solution:
+
 1. Check VS Code developer console for errors (Help → Toggle Developer Tools)
 2. Verify the path to `dist/index.js` is correct and absolute
 3. Reload VS Code: `Cmd+Shift+P` → "Developer: Reload Window"
@@ -271,6 +276,7 @@ Solution:
 Cause: Server may be unhealthy or tool doesn't exist
 
 Solution:
+
 1. Check server health via `mcpd` API
 2. Verify tool exists on the server
 3. Check `mcpd` logs for errors

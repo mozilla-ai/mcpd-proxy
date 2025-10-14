@@ -1,6 +1,7 @@
 {
   "mcpServers": {
-    "mcpd": {
+    "mcpd-proxy": {
+      "type": "stdio",
       "command": "node",
       "args": ["<path-to-mcpd-proxy>/dist/index.js"],
       "env": {
