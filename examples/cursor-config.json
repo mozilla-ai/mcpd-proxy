@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "mcpd-proxy": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["@mozilla-ai/mcpd-proxy"],
+      "env": {
+        "MCPD_ADDR": "http://localhost:8090"
+      }
+    }
+  }
+}
