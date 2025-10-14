@@ -71,25 +71,26 @@ export function parseResourceUri(uri: string): {
   server: string;
   originalUri: string;
 } {
-  if (!uri.startsWith("mcpd://")) {
+  let url: URL;
+  try {
+    url = new URL(uri);
+  } catch {
     throw new Error(
       `Invalid resource URI format: ${uri}. Expected format: mcpd://server/uri`,
     );
   }
 
-  const withoutScheme = uri.substring(7);
-  const slashIndex = withoutScheme.indexOf("/");
-
-  if (slashIndex === -1) {
+  if (url.protocol !== "mcpd:") {
     throw new Error(
-      `Invalid resource URI format: ${uri}. Missing path after server name`,
+      `Invalid resource URI format: ${uri}. Expected format: mcpd://server/uri`,
     );
   }
 
-  const server = withoutScheme.substring(0, slashIndex);
-  const originalUri = withoutScheme.substring(slashIndex + 1);
+  const server = url.hostname;
+  const pathname = url.pathname;
+  const originalUri = pathname.startsWith("/") ? pathname.slice(1) : pathname;
 
-  if (!server) {
+  if (!server || !originalUri) {
     throw new Error(
       `Invalid resource URI format: ${uri}. Missing path after server name`,
     );
@@ -323,7 +324,7 @@ export function createMcpServer(config: Config): Server {
         content: [
           {
             type: "text",
-            text: `Error executing tool '${fullToolName}': ${error instanceof Error ? error.message : String(error)}`,
+            text: `Error executing tool '${fullToolName}': ${(error as Error).message}`,
           },
         ],
         isError: true,
@@ -334,10 +335,9 @@ export function createMcpServer(config: Config): Server {
   server.setRequestHandler(ListResourcesRequestSchema, async () => {
     try {
       const allServers = await mcpdClient.listServers();
-      const mcpResources = [];
 
-      for (const serverName of allServers) {
-        try {
+      const results = await Promise.allSettled(
+        allServers.map(async (serverName) => {
           const response = await fetch(
             `${config.mcpdAddr}${API_PATHS.SERVER_RESOURCES(serverName)}`,
             {
@@ -348,29 +348,32 @@ export function createMcpServer(config: Config): Server {
           );
 
           if (!response.ok) {
-            continue;
+            throw new Error(
+              `Failed to fetch resources: ${response.status} ${response.statusText}`,
+            );
           }
 
           const data = (await response.json()) as Resources;
           const resources = data.resources || [];
 
-          for (const resource of resources) {
-            mcpResources.push({
-              uri: `mcpd://${serverName}/${resource.uri}`,
-              name: `${serverName}__${resource.name}`,
-              description:
-                resource.description ||
-                `Resource ${resource.name} from ${serverName} server`,
-              mimeType: resource.mimeType,
-            });
-          }
-        } catch (error) {
-          console.error(
-            `[mcpd-proxy] Error listing resources for '${serverName}':`,
-            error,
-          );
+          return resources.map((resource) => ({
+            uri: `mcpd://${serverName}/${resource.uri}`,
+            name: `${serverName}__${resource.name}`,
+            description:
+              resource.description ||
+              `Resource ${resource.name} from ${serverName} server`,
+            mimeType: resource.mimeType,
+          }));
+        }),
+      );
+
+      const mcpResources = results.flatMap((result) => {
+        if (result.status === "rejected") {
+          console.error("[mcpd-proxy] Error listing resources:", result.reason);
+          return [];
         }
-      }
+        return result.value;
+      });
 
       return { resources: mcpResources };
     } catch (error) {
@@ -410,10 +413,9 @@ export function createMcpServer(config: Config): Server {
   server.setRequestHandler(ListPromptsRequestSchema, async () => {
     try {
       const allServers = await mcpdClient.listServers();
-      const mcpPrompts = [];
 
-      for (const serverName of allServers) {
-        try {
+      const results = await Promise.allSettled(
+        allServers.map(async (serverName) => {
           const response = await fetch(
             `${config.mcpdAddr}${API_PATHS.SERVER_PROMPTS(serverName)}`,
             {
@@ -424,28 +426,31 @@ export function createMcpServer(config: Config): Server {
           );
 
           if (!response.ok) {
-            continue;
+            throw new Error(
+              `Failed to fetch prompts: ${response.status} ${response.statusText}`,
+            );
           }
 
           const data = (await response.json()) as Prompts;
           const prompts = data.prompts || [];
 
-          for (const prompt of prompts) {
-            mcpPrompts.push({
-              name: `${serverName}__${prompt.name}`,
-              description:
-                prompt.description ||
-                `Prompt ${prompt.name} from ${serverName} server`,
-              arguments: prompt.arguments,
-            });
-          }
-        } catch (error) {
-          console.error(
-            `[mcpd-proxy] Error listing prompts for '${serverName}':`,
-            error,
-          );
+          return prompts.map((prompt) => ({
+            name: `${serverName}__${prompt.name}`,
+            description:
+              prompt.description ||
+              `Prompt ${prompt.name} from ${serverName} server`,
+            arguments: prompt.arguments,
+          }));
+        }),
+      );
+
+      const mcpPrompts = results.flatMap((result) => {
+        if (result.status === "rejected") {
+          console.error("[mcpd-proxy] Error listing prompts:", result.reason);
+          return [];
         }
-      }
+        return result.value;
+      });
 
       return { prompts: mcpPrompts };
     } catch (error) {

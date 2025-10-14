@@ -36,3 +36,12 @@ jobs:
             git diff
             exit 1
           fi
+
+      - name: Check package-lock.json is up to date
+        run: |
+          npm install --package-lock-only
+          if [ -n "$(git status --porcelain package-lock.json)" ]; then
+            echo "Error: package-lock.json is out of date. Please run 'npm install' locally and commit the changes."
+            git diff package-lock.json
+            exit 1
+          fi
