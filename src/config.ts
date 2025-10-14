@@ -25,7 +25,7 @@ export interface Config {
  */
 export function loadConfig(): Config {
   return {
-    mcpdAddr: process.env.MCPD_ADDR || 'http://localhost:8090',
+    mcpdAddr: process.env.MCPD_ADDR || "http://localhost:8090",
     mcpdApiKey: process.env.MCPD_API_KEY,
   };
 }

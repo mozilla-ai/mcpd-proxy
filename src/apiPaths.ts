@@ -2,7 +2,7 @@
  * Centralized API path constants for mcpd daemon endpoints.
  */
 
-const API_BASE = '/api/v1';
+const API_BASE = "/api/v1";
 const SERVERS_BASE = `${API_BASE}/servers`;
 const HEALTH_BASE = `${API_BASE}/health`;
 
