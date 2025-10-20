@@ -95,6 +95,186 @@ export function parseResourceUri(uri: string): {
 }
 
 /**
+ * Get healthy servers from mcpd.
+ * Fetches all servers and filters by health status.
+ *
+ * @param client - McpdClient instance
+ * @param serverNames - Optional array of server names to filter. If not provided, gets all servers.
+ * @returns Array of healthy server names
+ */
+export async function getHealthyServers(
+  client: McpdClient,
+  serverNames?: string[],
+): Promise<string[]> {
+  // Get server list if not provided.
+  const servers = serverNames ?? (await client.listServers());
+
+  // Get health status for all servers.
+  const healthMap = await client.getServerHealth();
+
+  // Filter to only healthy servers.
+  return servers.filter((name) => {
+    const health = healthMap[name];
+    return health && health.status === "ok";
+  });
+}
+
+/**
+ * Aggregate tools from all healthy servers with namespaced names.
+ *
+ * @param client - McpdClient instance
+ * @param serverNames - Optional array of server names to filter
+ * @returns Array of tools with server__toolName naming
+ */
+export async function aggregateTools(
+  client: McpdClient,
+  serverNames?: string[],
+): Promise<
+  Array<{ name: string; description?: string; inputSchema: unknown }>
+> {
+  const healthyServers = await getHealthyServers(client, serverNames);
+
+  const results = await Promise.allSettled(
+    healthyServers.map(async (serverName) => ({
+      serverName,
+      tools: await client.servers[serverName]!.getTools(),
+    })),
+  );
+
+  return results
+    .filter((result) => result.status === "fulfilled")
+    .flatMap((result) => {
+      const { serverName, tools } = result.value;
+      return tools.map((tool) => ({
+        ...tool,
+        name: `${serverName}__${tool.name}`,
+      }));
+    });
+}
+
+/**
+ * Aggregate prompts from all healthy servers with namespaced names.
+ *
+ * @param client - McpdClient instance
+ * @param serverNames - Optional array of server names to filter
+ * @returns Array of prompts with server__promptName naming
+ */
+export async function aggregatePrompts(
+  client: McpdClient,
+  serverNames?: string[],
+): Promise<
+  Array<{
+    name: string;
+    description?: string;
+    arguments?: Array<{
+      name: string;
+      description?: string;
+      required?: boolean;
+    }>;
+  }>
+> {
+  const healthyServers = await getHealthyServers(client, serverNames);
+
+  const results = await Promise.allSettled(
+    healthyServers.map(async (serverName) => ({
+      serverName,
+      prompts: await client.servers[serverName]!.getPrompts(),
+    })),
+  );
+
+  return results
+    .filter((result) => result.status === "fulfilled")
+    .flatMap((result) => {
+      const { serverName, prompts } = result.value;
+      return prompts.map((prompt) => ({
+        ...prompt,
+        name: `${serverName}__${prompt.name}`,
+      }));
+    });
+}
+
+/**
+ * Aggregate resources from all healthy servers with namespaced names and mcpd:// URIs.
+ *
+ * @param client - McpdClient instance
+ * @param serverNames - Optional array of server names to filter
+ * @returns Array of resources with server__resourceName naming and mcpd:// URIs
+ */
+export async function aggregateResources(
+  client: McpdClient,
+  serverNames?: string[],
+): Promise<
+  Array<{
+    uri: string;
+    name: string;
+    description?: string;
+    mimeType?: string;
+    _serverName: string;
+    _originalUri: string;
+  }>
+> {
+  const healthyServers = await getHealthyServers(client, serverNames);
+
+  const results = await Promise.allSettled(
+    healthyServers.map(async (serverName) => ({
+      serverName,
+      resources: await client.servers[serverName]!.getResources(),
+    })),
+  );
+
+  return results
+    .filter((result) => result.status === "fulfilled")
+    .flatMap((result) => {
+      const { serverName, resources } = result.value;
+      return resources.map((resource) => ({
+        ...resource,
+        name: `${serverName}__${resource.name}`,
+        uri: `mcpd://${serverName}/${resource.uri}`,
+        _serverName: serverName,
+        _originalUri: resource.uri,
+      }));
+    });
+}
+
+/**
+ * Aggregate resource templates from all healthy servers with namespaced names.
+ *
+ * @param client - McpdClient instance
+ * @param serverNames - Optional array of server names to filter
+ * @returns Array of resource templates with server__templateName naming
+ */
+export async function aggregateResourceTemplates(
+  client: McpdClient,
+  serverNames?: string[],
+): Promise<
+  Array<{
+    uriTemplate: string;
+    name: string;
+    description?: string;
+    mimeType?: string;
+  }>
+> {
+  const healthyServers = await getHealthyServers(client, serverNames);
+
+  const results = await Promise.allSettled(
+    healthyServers.map(async (serverName) => ({
+      serverName,
+      templates: await client.servers[serverName]!.getResourceTemplates(),
+    })),
+  );
+
+  return results
+    .filter((result) => result.status === "fulfilled")
+    .flatMap((result) => {
+      const { serverName, templates } = result.value;
+      return templates.map((template) => ({
+        ...template,
+        name: `${serverName}__${template.name}`,
+      }));
+    });
+}
+
+/**
  * Create and configure the MCP server.
  *
  * Creates a singleton McpdClient instance and sets up all MCP protocol handlers.
@@ -141,10 +321,10 @@ export function createMcpServer(config: Config): Server {
   });
 
   server.setRequestHandler(ListToolsRequestSchema, async () => {
-    // NOTE: getTools() automatically filters out unhealthy servers.
+    // NOTE: aggregateTools() automatically filters out unhealthy servers.
     // It checks health status and only returns tools from healthy servers,
     // ensuring tools from unreachable or unhealthy servers are not exposed.
-    const allTools = await mcpdClient.getTools();
+    const allTools = await aggregateTools(mcpdClient);
     const mcpTools = allTools.map((tool) => ({
       name: tool.name,
       description: tool.description || `Tool ${tool.name}`,
@@ -283,18 +463,17 @@ export function createMcpServer(config: Config): Server {
   });
 
   server.setRequestHandler(ListResourcesRequestSchema, async () => {
-    // NOTE: getResources() automatically filters out unhealthy servers and
+    // NOTE: aggregateResources() automatically filters out unhealthy servers and
     // handles 501 Not Implemented responses. It returns resources with namespaced
-    // names (serverName__resourceName) and includes _serverName and _uri fields.
-    const allResources = await mcpdClient.getResources();
+    // names (serverName__resourceName) and mcpd:// URIs.
+    const allResources = await aggregateResources(mcpdClient);
 
-    // Transform SDK resources to MCP format with mcpd:// URIs.
+    // Transform to MCP format.
     const mcpResources = allResources.map((resource) => ({
-      uri: `mcpd://${resource._serverName}/${resource._uri}`,
-      name: resource.name, // Already namespaced by SDK
+      uri: resource.uri, // Already has mcpd:// URI from aggregateResources
+      name: resource.name, // Already namespaced
       description:
-        resource.description ||
-        `Resource ${resource._resourceName} from ${resource._serverName} server`,
+        resource.description || `Resource from ${resource._serverName} server`,
       mimeType: resource.mimeType,
     }));
 
@@ -315,14 +494,14 @@ export function createMcpServer(config: Config): Server {
   });
 
   server.setRequestHandler(ListResourceTemplatesRequestSchema, async () => {
-    // NOTE: getResourceTemplates() automatically filters out unhealthy servers and
+    // NOTE: aggregateResourceTemplates() automatically filters out unhealthy servers and
     // handles 501 Not Implemented responses. It returns templates with namespaced
-    // names (serverName__templateName) and includes _serverName and _templateName fields.
-    const allTemplates = await mcpdClient.getResourceTemplates();
+    // names (serverName__templateName).
+    const allTemplates = await aggregateResourceTemplates(mcpdClient);
 
-    // Transform SDK templates to MCP format.
+    // Transform to MCP format.
     const mcpTemplates = allTemplates.map((template) => ({
-      name: template.name, // Already namespaced by SDK
+      name: template.name, // Already namespaced
       uriTemplate: template.uriTemplate,
       description: template.description,
       mimeType: template.mimeType,
@@ -332,10 +511,10 @@ export function createMcpServer(config: Config): Server {
   });
 
   server.setRequestHandler(ListPromptsRequestSchema, async () => {
-    // NOTE: getPrompts() automatically filters out unhealthy servers and
+    // NOTE: aggregatePrompts() automatically filters out unhealthy servers and
     // handles 501 Not Implemented responses. It returns prompts with namespaced
     // names (serverName__promptName).
-    const allPrompts = await mcpdClient.getPrompts();
+    const allPrompts = await aggregatePrompts(mcpdClient);
 
     return { prompts: allPrompts };
   });

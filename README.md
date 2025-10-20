@@ -16,10 +16,10 @@ An MCP (Model Context Protocol) server that acts as a proxy between IDEs and the
 
 ## Features
 
-- Unified Interface: Single MCP server exposing all `mcpd`-managed tools
+- Unified Interface: Single MCP server exposing all `mcpd`-managed capabilities
 - Tool Aggregation: Tools from all servers with `server__tool` naming convention
-- Resource Support: Access resources from all servers with `mcpd://` URIs
-- Prompt Support: Aggregate prompts from all servers
+- Resource Aggregation: Resources from all servers with `server__resource` naming and `mcpd://` URIs
+- Prompt Aggregation: Prompts from all servers with `server__prompt` naming convention
 - Efficient Caching: Leverages SDK caching for health checks and tool schemas
 - Zero Configuration: Works out of the box with sensible defaults
 - TypeScript: Built with `TypeScript` for type safety
@@ -181,9 +181,11 @@ mcpd-proxy/
 │   └── apiPaths.ts            # API endpoint constants
 ├── tests/
 │   └── unit/                  # Unit test files
+│       ├── aggregation.test.ts
 │       ├── apiPaths.test.ts
 │       ├── config.test.ts
-│       └── parsers.test.ts
+│       ├── parsers.test.ts
+│       └── server.test.ts
 ├── .github/
 │   └── workflows/             # GitHub Actions workflows
 │       ├── tests.yaml
