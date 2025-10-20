@@ -28,6 +28,7 @@ import {
   TimeoutError,
 } from "@mozilla-ai/mcpd";
 import type { Config } from "./config.js";
+import pkg from "../package.json" with { type: "json" };
 
 /**
  * Parse a prefixed name in the format "server__name" into its components.
@@ -39,7 +40,7 @@ import type { Config } from "./config.js";
  */
 export function parsePrefixedName(
   fullName: string,
-  type: string,
+  type: "tool" | "prompt",
 ): { server: string; name: string } {
   const parts = fullName.split("__");
 
@@ -294,7 +295,7 @@ export function createMcpServer(config: Config): Server {
   const server = new Server(
     {
       name: "mcpd-proxy",
-      version: "0.0.1",
+      version: pkg.version,
     },
     {
       capabilities: {
@@ -315,7 +316,7 @@ export function createMcpServer(config: Config): Server {
       },
       serverInfo: {
         name: "mcpd-proxy",
-        version: "0.0.1",
+        version: pkg.version,
       },
     };
   });
@@ -520,11 +521,15 @@ export function createMcpServer(config: Config): Server {
   });
 
   server.setRequestHandler(GetPromptRequestSchema, async (request) => {
-    // Use SDK's generatePrompt method which handles health checks, parsing,
-    // and error handling automatically. The method expects the full namespaced
-    // name (serverName__promptName) which is what the proxy receives.
-    const result = await mcpdClient.generatePrompt(
+    // Parse the namespaced prompt name (serverName__promptName) and use
+    // server-level SDK API which handles health checks and error handling.
+    const { server: serverName, name: promptName } = parsePrefixedName(
       request.params.name,
+      "prompt",
+    );
+
+    const result = await mcpdClient.servers[serverName].generatePrompt(
+      promptName,
       request.params.arguments as Record<string, string> | undefined,
     );
 

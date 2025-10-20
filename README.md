@@ -348,22 +348,6 @@ Solution:
 1. Check server health via `mcpd` API
 2. Verify tool exists on the server
 3. Check `mcpd` logs for errors
-4. Check `stderr` output from `mcpd-proxy` for detailed error messages
-
-## Logging
-
-`mcpd-proxy` logs to `stderr` (`stdout` is reserved for MCP protocol):
-
-```
-============================================================
-mcpd-proxy v0.0.1
-============================================================
-mcpd daemon: http://localhost:8090
-API key: not set
-============================================================
-[mcpd-proxy] Connected and ready
-[mcpd-proxy] Error listing tools: <error details>
-```
 
 ## Future Enhancements
 
