@@ -12,6 +12,7 @@ import {
   InitializeRequestSchema,
   ListPromptsRequestSchema,
   ListResourcesRequestSchema,
+  ListResourceTemplatesRequestSchema,
   ListToolsRequestSchema,
   PingRequestSchema,
   ReadResourceRequestSchema,
@@ -25,14 +26,9 @@ import {
   ConnectionError,
   AuthenticationError,
   TimeoutError,
-  type Resources,
-  type Prompts,
-  type GeneratePromptResponseBody,
-  type ResourceContent,
-  type ErrorModel,
 } from "@mozilla-ai/mcpd";
 import type { Config } from "./config.js";
-import { API_PATHS } from "./apiPaths.js";
+import pkg from "../package.json" with { type: "json" };
 
 /**
  * Parse a prefixed name in the format "server__name" into its components.
@@ -44,7 +40,7 @@ import { API_PATHS } from "./apiPaths.js";
  */
 export function parsePrefixedName(
   fullName: string,
-  type: string,
+  type: "tool" | "prompt",
 ): { server: string; name: string } {
   const parts = fullName.split("__");
 
@@ -100,29 +96,183 @@ export function parseResourceUri(uri: string): {
 }
 
 /**
- * Parse an error response from the mcpd API to extract a meaningful error message.
+ * Get healthy servers from mcpd.
+ * Fetches all servers and filters by health status.
  *
- * @param response - The failed HTTP response
- * @returns A formatted error message with details from the ErrorModel
+ * @param client - McpdClient instance
+ * @param serverNames - Optional array of server names to filter. If not provided, gets all servers.
+ * @returns Array of healthy server names
  */
-async function parseErrorResponse(response: Response): Promise<string> {
-  try {
-    const errorData = (await response.json()) as ErrorModel;
-    let message = errorData.detail || errorData.title || "Unknown error";
+export async function getHealthyServers(
+  client: McpdClient,
+  serverNames?: string[],
+): Promise<string[]> {
+  // Get server list if not provided.
+  const servers = serverNames ?? (await client.listServers());
 
-    // Include field-level validation errors if present.
-    if (errorData.errors && errorData.errors.length > 0) {
-      const details = errorData.errors
-        .map((e) => `${e.location}: ${e.message}`)
-        .join(", ");
-      message += ` (${details})`;
-    }
+  // Get health status for all servers.
+  const healthMap = await client.getServerHealth();
 
-    return message;
-  } catch {
-    // If we can't parse JSON, return generic HTTP error.
-    return `HTTP ${response.status}: ${response.statusText}`;
-  }
+  // Filter to only healthy servers.
+  return servers.filter((name) => {
+    const health = healthMap[name];
+    return health && health.status === "ok";
+  });
+}
+
+/**
+ * Aggregate tools from all healthy servers with namespaced names.
+ *
+ * @param client - McpdClient instance
+ * @param serverNames - Optional array of server names to filter
+ * @returns Array of tools with server__toolName naming
+ */
+export async function aggregateTools(
+  client: McpdClient,
+  serverNames?: string[],
+): Promise<
+  Array<{ name: string; description?: string; inputSchema: unknown }>
+> {
+  const healthyServers = await getHealthyServers(client, serverNames);
+
+  const results = await Promise.allSettled(
+    healthyServers.map(async (serverName) => ({
+      serverName,
+      tools: await client.servers[serverName]!.getTools(),
+    })),
+  );
+
+  return results
+    .filter((result) => result.status === "fulfilled")
+    .flatMap((result) => {
+      const { serverName, tools } = result.value;
+      return tools.map((tool) => ({
+        ...tool,
+        name: `${serverName}__${tool.name}`,
+      }));
+    });
+}
+
+/**
+ * Aggregate prompts from all healthy servers with namespaced names.
+ *
+ * @param client - McpdClient instance
+ * @param serverNames - Optional array of server names to filter
+ * @returns Array of prompts with server__promptName naming
+ */
+export async function aggregatePrompts(
+  client: McpdClient,
+  serverNames?: string[],
+): Promise<
+  Array<{
+    name: string;
+    description?: string;
+    arguments?: Array<{
+      name: string;
+      description?: string;
+      required?: boolean;
+    }>;
+  }>
+> {
+  const healthyServers = await getHealthyServers(client, serverNames);
+
+  const results = await Promise.allSettled(
+    healthyServers.map(async (serverName) => ({
+      serverName,
+      prompts: await client.servers[serverName]!.getPrompts(),
+    })),
+  );
+
+  return results
+    .filter((result) => result.status === "fulfilled")
+    .flatMap((result) => {
+      const { serverName, prompts } = result.value;
+      return prompts.map((prompt) => ({
+        ...prompt,
+        name: `${serverName}__${prompt.name}`,
+      }));
+    });
+}
+
+/**
+ * Aggregate resources from all healthy servers with namespaced names and mcpd:// URIs.
+ *
+ * @param client - McpdClient instance
+ * @param serverNames - Optional array of server names to filter
+ * @returns Array of resources with server__resourceName naming and mcpd:// URIs
+ */
+export async function aggregateResources(
+  client: McpdClient,
+  serverNames?: string[],
+): Promise<
+  Array<{
+    uri: string;
+    name: string;
+    description?: string;
+    mimeType?: string;
+    _serverName: string;
+    _originalUri: string;
+  }>
+> {
+  const healthyServers = await getHealthyServers(client, serverNames);
+
+  const results = await Promise.allSettled(
+    healthyServers.map(async (serverName) => ({
+      serverName,
+      resources: await client.servers[serverName]!.getResources(),
+    })),
+  );
+
+  return results
+    .filter((result) => result.status === "fulfilled")
+    .flatMap((result) => {
+      const { serverName, resources } = result.value;
+      return resources.map((resource) => ({
+        ...resource,
+        name: `${serverName}__${resource.name}`,
+        uri: `mcpd://${serverName}/${resource.uri}`,
+        _serverName: serverName,
+        _originalUri: resource.uri,
+      }));
+    });
+}
+
+/**
+ * Aggregate resource templates from all healthy servers with namespaced names.
+ *
+ * @param client - McpdClient instance
+ * @param serverNames - Optional array of server names to filter
+ * @returns Array of resource templates with server__templateName naming
+ */
+export async function aggregateResourceTemplates(
+  client: McpdClient,
+  serverNames?: string[],
+): Promise<
+  Array<{
+    uriTemplate: string;
+    name: string;
+    description?: string;
+    mimeType?: string;
+  }>
+> {
+  const healthyServers = await getHealthyServers(client, serverNames);
+
+  const results = await Promise.allSettled(
+    healthyServers.map(async (serverName) => ({
+      serverName,
+      templates: await client.servers[serverName]!.getResourceTemplates(),
+    })),
+  );
+
+  return results
+    .filter((result) => result.status === "fulfilled")
+    .flatMap((result) => {
+      const { serverName, templates } = result.value;
+      return templates.map((template) => ({
+        ...template,
+        name: `${serverName}__${template.name}`,
+      }));
+    });
 }
 
 /**
@@ -145,7 +295,7 @@ export function createMcpServer(config: Config): Server {
   const server = new Server(
     {
       name: "mcpd-proxy",
-      version: "0.0.1",
+      version: pkg.version,
     },
     {
       capabilities: {
@@ -166,31 +316,26 @@ export function createMcpServer(config: Config): Server {
       },
       serverInfo: {
         name: "mcpd-proxy",
-        version: "0.0.1",
+        version: pkg.version,
       },
     };
   });
 
   server.setRequestHandler(ListToolsRequestSchema, async () => {
-    try {
-      // NOTE: getToolSchemas() automatically filters out unhealthy servers.
-      // It checks health status and only returns tools from healthy servers,
-      // ensuring tools from unreachable or unhealthy servers are not exposed.
-      const allTools = await mcpdClient.getToolSchemas();
-      const mcpTools = allTools.map((tool) => ({
-        name: tool.name,
-        description: tool.description || `Tool ${tool.name}`,
-        inputSchema: tool.inputSchema || {
-          type: "object",
-          properties: {},
-        },
-      }));
+    // NOTE: aggregateTools() automatically filters out unhealthy servers.
+    // It checks health status and only returns tools from healthy servers,
+    // ensuring tools from unreachable or unhealthy servers are not exposed.
+    const allTools = await aggregateTools(mcpdClient);
+    const mcpTools = allTools.map((tool) => ({
+      name: tool.name,
+      description: tool.description || `Tool ${tool.name}`,
+      inputSchema: tool.inputSchema || {
+        type: "object",
+        properties: {},
+      },
+    }));
 
-      return { tools: mcpTools };
-    } catch (error) {
-      console.error("[mcpd-proxy] Error listing tools:", error);
-      throw error;
-    }
+    return { tools: mcpTools };
   });
 
   server.setRequestHandler(CallToolRequestSchema, async (request) => {
@@ -217,9 +362,6 @@ export function createMcpServer(config: Config): Server {
     } catch (error) {
       // Handle SDK-specific errors with contextual messages.
       if (error instanceof ToolNotFoundError) {
-        console.error(
-          `[mcpd-proxy] Tool not found: ${error.toolName} on ${error.serverName}`,
-        );
         return {
           content: [
             {
@@ -232,7 +374,6 @@ export function createMcpServer(config: Config): Server {
       }
 
       if (error instanceof ToolExecutionError) {
-        console.error(`[mcpd-proxy] Tool execution failed:`, error.errorModel);
         let message = `Tool '${fullToolName}' execution failed: ${error.message}`;
 
         // Include detailed validation errors from mcpd API.
@@ -250,7 +391,6 @@ export function createMcpServer(config: Config): Server {
       }
 
       if (error instanceof ServerNotFoundError) {
-        console.error(`[mcpd-proxy] Server not found: ${error.serverName}`);
         return {
           content: [
             {
@@ -263,9 +403,6 @@ export function createMcpServer(config: Config): Server {
       }
 
       if (error instanceof ServerUnhealthyError) {
-        console.error(
-          `[mcpd-proxy] Server unhealthy: ${error.serverName} (${error.healthStatus})`,
-        );
         return {
           content: [
             {
@@ -278,7 +415,6 @@ export function createMcpServer(config: Config): Server {
       }
 
       if (error instanceof ConnectionError) {
-        console.error(`[mcpd-proxy] Connection error:`, error.message);
         return {
           content: [
             {
@@ -291,7 +427,6 @@ export function createMcpServer(config: Config): Server {
       }
 
       if (error instanceof AuthenticationError) {
-        console.error(`[mcpd-proxy] Authentication error:`, error.message);
         return {
           content: [
             {
@@ -304,9 +439,6 @@ export function createMcpServer(config: Config): Server {
       }
 
       if (error instanceof TimeoutError) {
-        console.error(
-          `[mcpd-proxy] Timeout error: ${error.operation} (${error.timeout}ms)`,
-        );
         return {
           content: [
             {
@@ -319,7 +451,6 @@ export function createMcpServer(config: Config): Server {
       }
 
       // Generic fallback for unexpected errors.
-      console.error(`[mcpd-proxy] Unexpected error:`, error);
       return {
         content: [
           {
@@ -333,171 +464,79 @@ export function createMcpServer(config: Config): Server {
   });
 
   server.setRequestHandler(ListResourcesRequestSchema, async () => {
-    try {
-      const allServers = await mcpdClient.listServers();
+    // NOTE: aggregateResources() automatically filters out unhealthy servers and
+    // handles 501 Not Implemented responses. It returns resources with namespaced
+    // names (serverName__resourceName) and mcpd:// URIs.
+    const allResources = await aggregateResources(mcpdClient);
 
-      const results = await Promise.allSettled(
-        allServers.map(async (serverName) => {
-          const response = await fetch(
-            `${config.mcpdAddr}${API_PATHS.SERVER_RESOURCES(serverName)}`,
-            {
-              headers: config.mcpdApiKey
-                ? { Authorization: `Bearer ${config.mcpdApiKey}` }
-                : {},
-            },
-          );
+    // Transform to MCP format.
+    const mcpResources = allResources.map((resource) => ({
+      uri: resource.uri, // Already has mcpd:// URI from aggregateResources
+      name: resource.name, // Already namespaced
+      description:
+        resource.description || `Resource from ${resource._serverName} server`,
+      mimeType: resource.mimeType,
+    }));
 
-          if (!response.ok) {
-            throw new Error(
-              `Failed to fetch resources: ${response.status} ${response.statusText}`,
-            );
-          }
-
-          const data = (await response.json()) as Resources;
-          const resources = data.resources || [];
-
-          return resources.map((resource) => ({
-            uri: `mcpd://${serverName}/${resource.uri}`,
-            name: `${serverName}__${resource.name}`,
-            description:
-              resource.description ||
-              `Resource ${resource.name} from ${serverName} server`,
-            mimeType: resource.mimeType,
-          }));
-        }),
-      );
-
-      const mcpResources = results.flatMap((result) => {
-        if (result.status === "rejected") {
-          console.error("[mcpd-proxy] Error listing resources:", result.reason);
-          return [];
-        }
-        return result.value;
-      });
-
-      return { resources: mcpResources };
-    } catch (error) {
-      console.error("[mcpd-proxy] Error listing resources:", error);
-      throw error;
-    }
+    return { resources: mcpResources };
   });
 
   server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
-    try {
-      const { server: serverName, originalUri } = parseResourceUri(
-        request.params.uri,
-      );
+    const { server: serverName, originalUri } = parseResourceUri(
+      request.params.uri,
+    );
 
-      const response = await fetch(
-        `${config.mcpdAddr}${API_PATHS.RESOURCE_CONTENT(serverName, originalUri)}`,
-        {
-          headers: config.mcpdApiKey
-            ? { Authorization: `Bearer ${config.mcpdApiKey}` }
-            : {},
-        },
-      );
+    // Use SDK's server-level readResource method which handles health checks
+    // and error handling automatically.
+    const contents =
+      await mcpdClient.servers[serverName].readResource(originalUri);
 
-      if (!response.ok) {
-        const errorMsg = await parseErrorResponse(response);
-        throw new Error(`Resource read failed: ${errorMsg}`);
-      }
+    return { contents };
+  });
 
-      const contents = (await response.json()) as ResourceContent[];
-      return { contents };
-    } catch (error) {
-      console.error("[mcpd-proxy] Resource read failed:", error);
-      throw error;
-    }
+  server.setRequestHandler(ListResourceTemplatesRequestSchema, async () => {
+    // NOTE: aggregateResourceTemplates() automatically filters out unhealthy servers and
+    // handles 501 Not Implemented responses. It returns templates with namespaced
+    // names (serverName__templateName).
+    const allTemplates = await aggregateResourceTemplates(mcpdClient);
+
+    // Transform to MCP format.
+    const mcpTemplates = allTemplates.map((template) => ({
+      name: template.name, // Already namespaced
+      uriTemplate: template.uriTemplate,
+      description: template.description,
+      mimeType: template.mimeType,
+    }));
+
+    return { resourceTemplates: mcpTemplates };
   });
 
   server.setRequestHandler(ListPromptsRequestSchema, async () => {
-    try {
-      const allServers = await mcpdClient.listServers();
+    // NOTE: aggregatePrompts() automatically filters out unhealthy servers and
+    // handles 501 Not Implemented responses. It returns prompts with namespaced
+    // names (serverName__promptName).
+    const allPrompts = await aggregatePrompts(mcpdClient);
 
-      const results = await Promise.allSettled(
-        allServers.map(async (serverName) => {
-          const response = await fetch(
-            `${config.mcpdAddr}${API_PATHS.SERVER_PROMPTS(serverName)}`,
-            {
-              headers: config.mcpdApiKey
-                ? { Authorization: `Bearer ${config.mcpdApiKey}` }
-                : {},
-            },
-          );
-
-          if (!response.ok) {
-            throw new Error(
-              `Failed to fetch prompts: ${response.status} ${response.statusText}`,
-            );
-          }
-
-          const data = (await response.json()) as Prompts;
-          const prompts = data.prompts || [];
-
-          return prompts.map((prompt) => ({
-            name: `${serverName}__${prompt.name}`,
-            description:
-              prompt.description ||
-              `Prompt ${prompt.name} from ${serverName} server`,
-            arguments: prompt.arguments,
-          }));
-        }),
-      );
-
-      const mcpPrompts = results.flatMap((result) => {
-        if (result.status === "rejected") {
-          console.error("[mcpd-proxy] Error listing prompts:", result.reason);
-          return [];
-        }
-        return result.value;
-      });
-
-      return { prompts: mcpPrompts };
-    } catch (error) {
-      console.error("[mcpd-proxy] Error listing prompts:", error);
-      throw error;
-    }
+    return { prompts: allPrompts };
   });
 
   server.setRequestHandler(GetPromptRequestSchema, async (request) => {
-    try {
-      const { server: serverName, name } = parsePrefixedName(
-        request.params.name,
-        "prompt",
-      );
+    // Parse the namespaced prompt name (serverName__promptName) and use
+    // server-level SDK API which handles health checks and error handling.
+    const { server: serverName, name: promptName } = parsePrefixedName(
+      request.params.name,
+      "prompt",
+    );
 
-      const response = await fetch(
-        `${config.mcpdAddr}${API_PATHS.PROMPT_GET(serverName, name)}`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            ...(config.mcpdApiKey
-              ? { Authorization: `Bearer ${config.mcpdApiKey}` }
-              : {}),
-          },
-          body: JSON.stringify({
-            arguments: request.params.arguments || {},
-          }),
-        },
-      );
+    const result = await mcpdClient.servers[serverName].generatePrompt(
+      promptName,
+      request.params.arguments as Record<string, string> | undefined,
+    );
 
-      if (!response.ok) {
-        throw new Error(
-          `Prompt generation failed: ${response.status} ${response.statusText}`,
-        );
-      }
-
-      const result = (await response.json()) as GeneratePromptResponseBody;
-
-      return {
-        description: result.description,
-        messages: result.messages || [],
-      };
-    } catch (error) {
-      console.error("[mcpd-proxy] Prompt generation failed:", error);
-      throw error;
-    }
+    return {
+      description: result.description,
+      messages: result.messages || [],
+    };
   });
 
   server.setRequestHandler(PingRequestSchema, async () => {
