@@ -6,7 +6,7 @@ import {
   aggregateResources,
   aggregateResourceTemplates,
 } from "../../src/server";
-import type { McpdClient } from "@mozilla-ai/mcpd";
+import type { McpdClient, ServerHealth } from "@mozilla-ai/mcpd";
 
 describe("Aggregation Functions", () => {
   let mockClient: McpdClient;
@@ -32,13 +32,13 @@ describe("Aggregation Functions", () => {
 
   describe("getHealthyServers", () => {
     it("should return only servers with status 'ok'", async () => {
-      (mockClient.listServers as ReturnType<typeof vi.fn>).mockResolvedValue([
+      vi.mocked(mockClient.listServers).mockResolvedValue([
         "server1",
         "server2",
         "server3",
       ]);
-      (
-        mockClient.getServerHealth as ReturnType<typeof vi.fn>
+      vi.mocked<() => Promise<Record<string, ServerHealth>>>(
+        mockClient.getServerHealth,
       ).mockResolvedValue({
         server1: { name: "server1", status: "ok" },
         server2: { name: "server2", status: "timeout" },
@@ -51,12 +51,12 @@ describe("Aggregation Functions", () => {
     });
 
     it("should filter out unreachable servers", async () => {
-      (mockClient.listServers as ReturnType<typeof vi.fn>).mockResolvedValue([
+      vi.mocked(mockClient.listServers).mockResolvedValue([
         "server1",
         "server2",
       ]);
-      (
-        mockClient.getServerHealth as ReturnType<typeof vi.fn>
+      vi.mocked<() => Promise<Record<string, ServerHealth>>>(
+        mockClient.getServerHealth,
       ).mockResolvedValue({
         server1: { name: "server1", status: "ok" },
         server2: { name: "server2", status: "unreachable" },
@@ -68,12 +68,12 @@ describe("Aggregation Functions", () => {
     });
 
     it("should return empty array when no servers are healthy", async () => {
-      (mockClient.listServers as ReturnType<typeof vi.fn>).mockResolvedValue([
+      vi.mocked(mockClient.listServers).mockResolvedValue([
         "server1",
         "server2",
       ]);
-      (
-        mockClient.getServerHealth as ReturnType<typeof vi.fn>
+      vi.mocked<() => Promise<Record<string, ServerHealth>>>(
+        mockClient.getServerHealth,
       ).mockResolvedValue({
         server1: { name: "server1", status: "timeout" },
         server2: { name: "server2", status: "unreachable" },
@@ -85,8 +85,8 @@ describe("Aggregation Functions", () => {
     });
 
     it("should use provided serverNames if specified", async () => {
-      (
-        mockClient.getServerHealth as ReturnType<typeof vi.fn>
+      vi.mocked<() => Promise<Record<string, ServerHealth>>>(
+        mockClient.getServerHealth,
       ).mockResolvedValue({
         time: { name: "time", status: "ok" },
         fetch: { name: "fetch", status: "ok" },
@@ -101,12 +101,9 @@ describe("Aggregation Functions", () => {
 
   describe("aggregateTools", () => {
     it("should namespace tool names with server__tool format", async () => {
-      (mockClient.listServers as ReturnType<typeof vi.fn>).mockResolvedValue([
-        "time",
-        "fetch",
-      ]);
-      (
-        mockClient.getServerHealth as ReturnType<typeof vi.fn>
+      vi.mocked(mockClient.listServers).mockResolvedValue(["time", "fetch"]);
+      vi.mocked<() => Promise<Record<string, ServerHealth>>>(
+        mockClient.getServerHealth,
       ).mockResolvedValue({
         time: { name: "time", status: "ok" },
         fetch: { name: "fetch", status: "ok" },
@@ -151,12 +148,12 @@ describe("Aggregation Functions", () => {
     });
 
     it("should only include tools from healthy servers", async () => {
-      (mockClient.listServers as ReturnType<typeof vi.fn>).mockResolvedValue([
+      vi.mocked(mockClient.listServers).mockResolvedValue([
         "server1",
         "server2",
       ]);
-      (
-        mockClient.getServerHealth as ReturnType<typeof vi.fn>
+      vi.mocked<() => Promise<Record<string, ServerHealth>>>(
+        mockClient.getServerHealth,
       ).mockResolvedValue({
         server1: { name: "server1", status: "ok" },
         server2: { name: "server2", status: "unreachable" },
@@ -185,12 +182,12 @@ describe("Aggregation Functions", () => {
     });
 
     it("should handle Promise.allSettled rejections gracefully", async () => {
-      (mockClient.listServers as ReturnType<typeof vi.fn>).mockResolvedValue([
+      vi.mocked(mockClient.listServers).mockResolvedValue([
         "server1",
         "server2",
       ]);
-      (
-        mockClient.getServerHealth as ReturnType<typeof vi.fn>
+      vi.mocked<() => Promise<Record<string, ServerHealth>>>(
+        mockClient.getServerHealth,
       ).mockResolvedValue({
         server1: { name: "server1", status: "ok" },
         server2: { name: "server2", status: "ok" },
@@ -230,11 +227,9 @@ describe("Aggregation Functions", () => {
     });
 
     it("should preserve tool metadata", async () => {
-      (mockClient.listServers as ReturnType<typeof vi.fn>).mockResolvedValue([
-        "server1",
-      ]);
-      (
-        mockClient.getServerHealth as ReturnType<typeof vi.fn>
+      vi.mocked(mockClient.listServers).mockResolvedValue(["server1"]);
+      vi.mocked<() => Promise<Record<string, ServerHealth>>>(
+        mockClient.getServerHealth,
       ).mockResolvedValue({
         server1: { name: "server1", status: "ok" },
       });
@@ -278,12 +273,9 @@ describe("Aggregation Functions", () => {
 
   describe("aggregatePrompts", () => {
     it("should namespace prompt names with server__prompt format", async () => {
-      (mockClient.listServers as ReturnType<typeof vi.fn>).mockResolvedValue([
-        "github",
-        "code",
-      ]);
-      (
-        mockClient.getServerHealth as ReturnType<typeof vi.fn>
+      vi.mocked(mockClient.listServers).mockResolvedValue(["github", "code"]);
+      vi.mocked<() => Promise<Record<string, ServerHealth>>>(
+        mockClient.getServerHealth,
       ).mockResolvedValue({
         github: { name: "github", status: "ok" },
         code: { name: "code", status: "ok" },
@@ -327,12 +319,12 @@ describe("Aggregation Functions", () => {
     });
 
     it("should only include prompts from healthy servers", async () => {
-      (mockClient.listServers as ReturnType<typeof vi.fn>).mockResolvedValue([
+      vi.mocked(mockClient.listServers).mockResolvedValue([
         "server1",
         "server2",
       ]);
-      (
-        mockClient.getServerHealth as ReturnType<typeof vi.fn>
+      vi.mocked<() => Promise<Record<string, ServerHealth>>>(
+        mockClient.getServerHealth,
       ).mockResolvedValue({
         server1: { name: "server1", status: "ok" },
         server2: { name: "server2", status: "timeout" },
@@ -360,12 +352,12 @@ describe("Aggregation Functions", () => {
     });
 
     it("should handle Promise.allSettled rejections gracefully", async () => {
-      (mockClient.listServers as ReturnType<typeof vi.fn>).mockResolvedValue([
+      vi.mocked(mockClient.listServers).mockResolvedValue([
         "server1",
         "server2",
       ]);
-      (
-        mockClient.getServerHealth as ReturnType<typeof vi.fn>
+      vi.mocked<() => Promise<Record<string, ServerHealth>>>(
+        mockClient.getServerHealth,
       ).mockResolvedValue({
         server1: { name: "server1", status: "ok" },
         server2: { name: "server2", status: "ok" },
@@ -404,11 +396,9 @@ describe("Aggregation Functions", () => {
     });
 
     it("should preserve prompt arguments", async () => {
-      (mockClient.listServers as ReturnType<typeof vi.fn>).mockResolvedValue([
-        "server1",
-      ]);
-      (
-        mockClient.getServerHealth as ReturnType<typeof vi.fn>
+      vi.mocked(mockClient.listServers).mockResolvedValue(["server1"]);
+      vi.mocked<() => Promise<Record<string, ServerHealth>>>(
+        mockClient.getServerHealth,
       ).mockResolvedValue({
         server1: { name: "server1", status: "ok" },
       });
@@ -443,12 +433,9 @@ describe("Aggregation Functions", () => {
 
   describe("aggregateResources", () => {
     it("should namespace resource names and transform URIs to mcpd:// format", async () => {
-      (mockClient.listServers as ReturnType<typeof vi.fn>).mockResolvedValue([
-        "docs",
-        "config",
-      ]);
-      (
-        mockClient.getServerHealth as ReturnType<typeof vi.fn>
+      vi.mocked(mockClient.listServers).mockResolvedValue(["docs", "config"]);
+      vi.mocked<() => Promise<Record<string, ServerHealth>>>(
+        mockClient.getServerHealth,
       ).mockResolvedValue({
         docs: { name: "docs", status: "ok" },
         config: { name: "config", status: "ok" },
@@ -496,12 +483,12 @@ describe("Aggregation Functions", () => {
     });
 
     it("should only include resources from healthy servers", async () => {
-      (mockClient.listServers as ReturnType<typeof vi.fn>).mockResolvedValue([
+      vi.mocked(mockClient.listServers).mockResolvedValue([
         "server1",
         "server2",
       ]);
-      (
-        mockClient.getServerHealth as ReturnType<typeof vi.fn>
+      vi.mocked<() => Promise<Record<string, ServerHealth>>>(
+        mockClient.getServerHealth,
       ).mockResolvedValue({
         server1: { name: "server1", status: "ok" },
         server2: { name: "server2", status: "unknown" },
@@ -529,12 +516,12 @@ describe("Aggregation Functions", () => {
     });
 
     it("should handle Promise.allSettled rejections gracefully", async () => {
-      (mockClient.listServers as ReturnType<typeof vi.fn>).mockResolvedValue([
+      vi.mocked(mockClient.listServers).mockResolvedValue([
         "server1",
         "server2",
       ]);
-      (
-        mockClient.getServerHealth as ReturnType<typeof vi.fn>
+      vi.mocked<() => Promise<Record<string, ServerHealth>>>(
+        mockClient.getServerHealth,
       ).mockResolvedValue({
         server1: { name: "server1", status: "ok" },
         server2: { name: "server2", status: "ok" },
@@ -573,11 +560,9 @@ describe("Aggregation Functions", () => {
     });
 
     it("should preserve resource metadata", async () => {
-      (mockClient.listServers as ReturnType<typeof vi.fn>).mockResolvedValue([
-        "server1",
-      ]);
-      (
-        mockClient.getServerHealth as ReturnType<typeof vi.fn>
+      vi.mocked(mockClient.listServers).mockResolvedValue(["server1"]);
+      vi.mocked<() => Promise<Record<string, ServerHealth>>>(
+        mockClient.getServerHealth,
       ).mockResolvedValue({
         server1: { name: "server1", status: "ok" },
       });
@@ -610,12 +595,9 @@ describe("Aggregation Functions", () => {
 
   describe("aggregateResourceTemplates", () => {
     it("should namespace template names", async () => {
-      (mockClient.listServers as ReturnType<typeof vi.fn>).mockResolvedValue([
-        "files",
-        "web",
-      ]);
-      (
-        mockClient.getServerHealth as ReturnType<typeof vi.fn>
+      vi.mocked(mockClient.listServers).mockResolvedValue(["files", "web"]);
+      vi.mocked<() => Promise<Record<string, ServerHealth>>>(
+        mockClient.getServerHealth,
       ).mockResolvedValue({
         files: { name: "files", status: "ok" },
         web: { name: "web", status: "ok" },
@@ -660,12 +642,12 @@ describe("Aggregation Functions", () => {
     });
 
     it("should only include templates from healthy servers", async () => {
-      (mockClient.listServers as ReturnType<typeof vi.fn>).mockResolvedValue([
+      vi.mocked(mockClient.listServers).mockResolvedValue([
         "server1",
         "server2",
       ]);
-      (
-        mockClient.getServerHealth as ReturnType<typeof vi.fn>
+      vi.mocked<() => Promise<Record<string, ServerHealth>>>(
+        mockClient.getServerHealth,
       ).mockResolvedValue({
         server1: { name: "server1", status: "ok" },
         server2: { name: "server2", status: "unreachable" },
@@ -693,12 +675,12 @@ describe("Aggregation Functions", () => {
     });
 
     it("should handle Promise.allSettled rejections gracefully", async () => {
-      (mockClient.listServers as ReturnType<typeof vi.fn>).mockResolvedValue([
+      vi.mocked(mockClient.listServers).mockResolvedValue([
         "server1",
         "server2",
       ]);
-      (
-        mockClient.getServerHealth as ReturnType<typeof vi.fn>
+      vi.mocked<() => Promise<Record<string, ServerHealth>>>(
+        mockClient.getServerHealth,
       ).mockResolvedValue({
         server1: { name: "server1", status: "ok" },
         server2: { name: "server2", status: "ok" },
@@ -737,11 +719,9 @@ describe("Aggregation Functions", () => {
     });
 
     it("should preserve template metadata", async () => {
-      (mockClient.listServers as ReturnType<typeof vi.fn>).mockResolvedValue([
-        "server1",
-      ]);
-      (
-        mockClient.getServerHealth as ReturnType<typeof vi.fn>
+      vi.mocked(mockClient.listServers).mockResolvedValue(["server1"]);
+      vi.mocked<() => Promise<Record<string, ServerHealth>>>(
+        mockClient.getServerHealth,
       ).mockResolvedValue({
         server1: { name: "server1", status: "ok" },
       });
