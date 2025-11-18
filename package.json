@@ -75,7 +75,7 @@
     "vitest": "^4.0.10"
   },
   "engines": {
-    "node": ">=22.9.0"
+    "node": ">=22.10.0"
   },
   "packageManager": "npm@11.6.2"
 }
