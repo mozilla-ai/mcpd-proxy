@@ -19,24 +19,26 @@ const mockReadResource = vi.fn();
 
 // Mock the @mozilla-ai/mcpd module.
 vi.mock("@mozilla-ai/mcpd", () => ({
-  McpdClient: vi.fn().mockImplementation(() => ({
-    listServers: mockListServers,
-    getServerHealth: mockGetServerHealth,
-    generatePrompt: mockGeneratePrompt,
-    servers: new Proxy(
-      {},
-      {
-        get: () => ({
-          callTool: mockCallTool,
-          getTools: mockGetTools,
-          getPrompts: mockGetPrompts,
-          getResources: mockGetResources,
-          getResourceTemplates: mockGetResourceTemplates,
-          readResource: mockReadResource,
-        }),
-      },
-    ),
-  })),
+  McpdClient: vi.fn(
+    class {
+      listServers = mockListServers;
+      getServerHealth = mockGetServerHealth;
+      generatePrompt = mockGeneratePrompt;
+      servers = new Proxy(
+        {},
+        {
+          get: () => ({
+            callTool: mockCallTool,
+            getTools: mockGetTools,
+            getPrompts: mockGetPrompts,
+            getResources: mockGetResources,
+            getResourceTemplates: mockGetResourceTemplates,
+            readResource: mockReadResource,
+          }),
+        },
+      );
+    },
+  ),
   ToolNotFoundError: class ToolNotFoundError extends Error {},
   ToolExecutionError: class ToolExecutionError extends Error {},
   ServerNotFoundError: class ServerNotFoundError extends Error {},
