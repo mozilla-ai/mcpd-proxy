@@ -26,7 +26,7 @@ An MCP (Model Context Protocol) server that acts as a proxy between IDEs and the
 
 ## Prerequisites
 
-- `Node.js` 22 or higher
+- `Node.js` 22.9.0 or higher
 - `mcpd` daemon running and accessible
 - `mcpd` SDK (automatically installed as a dependency)
 
