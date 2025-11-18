@@ -19,8 +19,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "lint": "eslint . && npm run typecheck:all",
-    "lint:fix": "eslint . --fix",
+    "lint": "npm run format:check && eslint . && npm run typecheck:all",
+    "lint:fix": "npm run format && eslint . --fix && npm run typecheck:all",
     "format": "prettier --write \"**/*.{ts,tsx,json,md}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,json,md}\"",
     "typecheck": "tsc --noEmit",
@@ -75,6 +75,7 @@
     "vitest": "^4.0.10"
   },
   "engines": {
-    "node": ">=22.0.0"
-  }
+    "node": ">=22.9.0"
+  },
+  "packageManager": "npm@11.6.2"
 }
