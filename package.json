@@ -1,6 +1,6 @@
 {
   "name": "@mozilla-ai/mcpd-proxy",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "MCP server proxy for mcpd daemon",
   "main": "./dist/index.mjs",
   "types": "./dist/index.d.ts",
