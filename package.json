@@ -1,6 +1,6 @@
 {
   "name": "@mozilla-ai/mcpd-proxy",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "description": "MCP server proxy for mcpd daemon",
   "main": "./dist/index.mjs",
   "types": "./dist/index.d.ts",
@@ -54,7 +54,7 @@
   ],
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.24.0",
-    "@mozilla-ai/mcpd": "^0.0.3"
+    "@mozilla-ai/mcpd": "^0.0.4"
   },
   "devDependencies": {
     "@eslint/js": "^9.37.0",

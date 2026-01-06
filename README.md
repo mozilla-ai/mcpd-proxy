@@ -289,7 +289,6 @@ const mcpdClient = new McpdClient({
   apiEndpoint: config.mcpdAddr,
   apiKey: config.mcpdApiKey,
   healthCacheTtl: 10,
-  serverCacheTtl: 60,
 });
 ```
 

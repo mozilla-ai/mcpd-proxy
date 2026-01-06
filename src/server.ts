@@ -289,7 +289,6 @@ export function createMcpServer(config: Config): Server {
     apiEndpoint: config.mcpdAddr,
     apiKey: config.mcpdApiKey,
     healthCacheTtl: 10,
-    serverCacheTtl: 60,
   });
 
   const server = new Server(
