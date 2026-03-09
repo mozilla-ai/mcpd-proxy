@@ -388,7 +388,7 @@ describe("Server Request Handlers", () => {
         content: [
           {
             type: "text",
-            text: "Tool 'server1__my_tool' pipeline undefined error: Unknown pipeline failure",
+            text: "Tool 'server1__my_tool' pipeline error: Unknown pipeline failure",
           },
         ],
         isError: true,
