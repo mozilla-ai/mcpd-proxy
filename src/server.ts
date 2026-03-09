@@ -451,7 +451,8 @@ export function createMcpServer(config: Config): Server {
       }
 
       if (error instanceof PipelineError) {
-        const message = `Tool '${fullToolName}' pipeline ${error.pipelineFlow} error${error.message ? `: ${error.message}` : ""}`;
+        const flowText = error.pipelineFlow ? ` ${error.pipelineFlow}` : "";
+        const message = `Tool '${fullToolName}' pipeline${flowText} error${error.message ? `: ${error.message}` : ""}`;
 
         return {
           content: [
