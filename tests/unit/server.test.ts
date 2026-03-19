@@ -5,6 +5,11 @@ import {
   parseResourceUri,
 } from "../../src/server";
 import type { Config } from "../../src/config";
+import {
+  PipelineError,
+  PIPELINE_FLOW_REQUEST,
+  PIPELINE_FLOW_RESPONSE,
+} from "@mozilla-ai/mcpd";
 
 // Create mock functions at module level (before vi.mock hoisting).
 const mockListServers = vi.fn();
@@ -17,8 +22,9 @@ const mockGetResources = vi.fn();
 const mockGetResourceTemplates = vi.fn();
 const mockReadResource = vi.fn();
 
-// Mock the @mozilla-ai/mcpd module.
-vi.mock("@mozilla-ai/mcpd", () => ({
+// Mock only the McpdClient class; real error classes and constants pass through.
+vi.mock("@mozilla-ai/mcpd", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@mozilla-ai/mcpd")>()),
   McpdClient: vi.fn(
     class {
       listServers = mockListServers;
@@ -39,13 +45,6 @@ vi.mock("@mozilla-ai/mcpd", () => ({
       );
     },
   ),
-  ToolNotFoundError: class ToolNotFoundError extends Error {},
-  ToolExecutionError: class ToolExecutionError extends Error {},
-  ServerNotFoundError: class ServerNotFoundError extends Error {},
-  ServerUnhealthyError: class ServerUnhealthyError extends Error {},
-  ConnectionError: class ConnectionError extends Error {},
-  AuthenticationError: class AuthenticationError extends Error {},
-  TimeoutError: class TimeoutError extends Error {},
 }));
 
 describe("Server Request Handlers", () => {
@@ -298,6 +297,16 @@ describe("Server Request Handlers", () => {
   });
 
   describe("CallToolRequestSchema handler", () => {
+    // Retrieves the registered tools/call handler from the MCP server internals.
+    function getCallToolHandler(server: ReturnType<typeof createMcpServer>) {
+      const handlers = (
+        server as unknown as {
+          _requestHandlers: Map<string, (req: unknown) => Promise<unknown>>;
+        }
+      )._requestHandlers;
+      return handlers.get("tools/call")!;
+    }
+
     it("should call tool on correct server", async () => {
       mockCallTool.mockResolvedValue({ result: "tool executed" });
 
@@ -308,6 +317,82 @@ describe("Server Request Handlers", () => {
     it("should handle tool not found errors", async () => {
       const server = createMcpServer(config);
       expect(server).toBeDefined();
+    });
+
+    it("should handle PipelineError on request flow", async () => {
+      mockCallTool.mockRejectedValue(
+        new PipelineError(
+          "Auth plugin rejected request",
+          "server1",
+          "callTool",
+          PIPELINE_FLOW_REQUEST,
+        ),
+      );
+
+      const handler = getCallToolHandler(createMcpServer(config));
+      const result = await handler({
+        method: "tools/call",
+        params: { name: "server1__my_tool", arguments: {} },
+      });
+
+      expect(result).toEqual({
+        content: [
+          {
+            type: "text",
+            text: "Tool 'server1__my_tool' pipeline request error: Auth plugin rejected request",
+          },
+        ],
+        isError: true,
+      });
+    });
+
+    it("should handle PipelineError on response flow", async () => {
+      mockCallTool.mockRejectedValue(
+        new PipelineError(
+          "Response transform failed",
+          "server1",
+          "callTool",
+          PIPELINE_FLOW_RESPONSE,
+        ),
+      );
+
+      const handler = getCallToolHandler(createMcpServer(config));
+      const result = await handler({
+        method: "tools/call",
+        params: { name: "server1__my_tool", arguments: {} },
+      });
+
+      expect(result).toEqual({
+        content: [
+          {
+            type: "text",
+            text: "Tool 'server1__my_tool' pipeline response error: Response transform failed",
+          },
+        ],
+        isError: true,
+      });
+    });
+
+    it("should handle PipelineError with undefined flow", async () => {
+      mockCallTool.mockRejectedValue(
+        new PipelineError("Unknown pipeline failure", "server1", "callTool"),
+      );
+
+      const handler = getCallToolHandler(createMcpServer(config));
+      const result = await handler({
+        method: "tools/call",
+        params: { name: "server1__my_tool", arguments: {} },
+      });
+
+      expect(result).toEqual({
+        content: [
+          {
+            type: "text",
+            text: "Tool 'server1__my_tool' pipeline error: Unknown pipeline failure",
+          },
+        ],
+        isError: true,
+      });
     });
   });
 

@@ -26,6 +26,7 @@ import {
   ConnectionError,
   AuthenticationError,
   TimeoutError,
+  PipelineError,
 } from "@mozilla-ai/mcpd";
 import type { Config } from "./config.js";
 import pkg from "../package.json" with { type: "json" };
@@ -443,6 +444,21 @@ export function createMcpServer(config: Config): Server {
             {
               type: "text",
               text: `Tool '${fullToolName}' execution timed out. The operation may be taking too long. Please try again.`,
+            },
+          ],
+          isError: true,
+        };
+      }
+
+      if (error instanceof PipelineError) {
+        const flowText = error.pipelineFlow ? ` ${error.pipelineFlow}` : "";
+        const message = `Tool '${fullToolName}' pipeline${flowText} error${error.message ? `: ${error.message}` : ""}`;
+
+        return {
+          content: [
+            {
+              type: "text",
+              text: message,
             },
           ],
           isError: true,
