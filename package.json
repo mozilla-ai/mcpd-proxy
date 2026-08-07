@@ -53,8 +53,8 @@
     "src"
   ],
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.24.0",
-    "@mozilla-ai/mcpd": "^0.1.4"
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "@mozilla-ai/mcpd": "^0.1.5"
   },
   "devDependencies": {
     "@eslint/js": "^9.37.0",
