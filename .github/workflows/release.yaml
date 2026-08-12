@@ -53,6 +53,10 @@ jobs:
           TAG: ${{ github.event.release.tag_name || github.event.inputs.tag }}
         run: |
           VERSION="${TAG#v}"
+          if [ "$VERSION" = "0.0.0" ]; then
+            echo "Error: refusing to publish the 0.0.0 placeholder; tag a real release (vX.Y.Z)"
+            exit 1
+          fi
           npm version --no-git-tag-version --allow-same-version "$VERSION"
 
       - name: Build package
