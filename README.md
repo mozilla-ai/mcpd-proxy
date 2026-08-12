@@ -247,6 +247,14 @@ echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":
 echo '{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}' | node dist/index.mjs
 ```
 
+### Releasing
+
+The published version is derived from the git tag, so there is no version-bump commit. The `version` field in `package.json` is a `0.0.0` placeholder; CI stamps the real version from the release tag before building and publishing.
+
+To cut a release, create a GitHub release (and tag) named `vX.Y.Z`. The `Publish to npm` workflow then sets the package version to `X.Y.Z`, builds, and publishes.
+
+Do not run `npm publish` by hand — a local build carries the `0.0.0` placeholder. Publishing goes through the tag/release flow only.
+
 ## Naming Conventions
 
 ### Tools

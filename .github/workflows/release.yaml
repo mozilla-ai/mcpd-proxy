@@ -22,9 +22,10 @@ jobs:
           fetch-depth: 0
 
       - name: Checkout release tag
+        env:
+          TAG: ${{ github.event.release.tag_name || github.event.inputs.tag }}
         run: |
           git fetch --tags
-          TAG="${{ github.event.release.tag_name || github.event.inputs.tag }}"
           if [ -z "$TAG" ]; then
             echo "Error: No tag provided in release event or workflow_dispatch input"
             exit 1
@@ -46,6 +47,13 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Set version from tag
+        env:
+          TAG: ${{ github.event.release.tag_name || github.event.inputs.tag }}
+        run: |
+          VERSION="${TAG#v}"
+          npm version --no-git-tag-version --allow-same-version "$VERSION"
 
       - name: Build package
         run: npm run build
