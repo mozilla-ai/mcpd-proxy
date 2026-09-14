@@ -27,6 +27,7 @@ An MCP (Model Context Protocol) server that acts as a proxy between IDEs and the
 ## Prerequisites
 
 - `Node.js` 22.10.0 or higher (latest 22.x recommended)
+- `npm` 11.19.1 for development (the version pinned by `packageManager` in `package.json`, see [Development Workflow](#development-workflow))
 - `mcpd` daemon running and accessible
 - `mcpd` SDK (automatically installed as a dependency)
 
@@ -208,6 +209,21 @@ mcpd-proxy/
 ```
 
 ### Development Workflow
+
+Use the exact `npm` version pinned by `packageManager` in `package.json`.
+Different `npm` versions write `package-lock.json` differently, and CI regenerates the lock file with the pinned version and fails if the result differs.
+The `npm` bundled with a Node.js release is often older than the pin, so check before installing:
+
+```bash
+# Option A: let corepack pick the pinned version (Node.js 22 and 24 ship corepack)
+corepack enable npm
+
+# Option B: install the pinned version globally
+npm install -g npm@11.19.1
+
+# Either way, this must print 11.19.1
+npm --version
+```
 
 ```bash
 # Install dependencies
