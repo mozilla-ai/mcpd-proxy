@@ -78,6 +78,29 @@ describe("Server Request Handlers", () => {
       const server = createMcpServer(config);
       expect(server).toBeDefined();
     });
+
+    it("should report the package version in serverInfo", async () => {
+      const server = createMcpServer(config);
+      // Retrieves the registered initialize handler from the MCP server internals.
+      const handlers = (
+        server as unknown as {
+          _requestHandlers: Map<string, (req: unknown) => Promise<unknown>>;
+        }
+      )._requestHandlers;
+
+      const result = (await handlers.get("initialize")!({
+        method: "initialize",
+        params: {
+          protocolVersion: "2024-11-05",
+          capabilities: {},
+          clientInfo: { name: "test-client", version: "1.0.0" },
+        },
+      })) as { serverInfo: { name: string; version: string } };
+
+      expect(result.serverInfo.name).toBe("mcpd-proxy");
+      // A shape match survives version bumps and still fails on an undefined version.
+      expect(result.serverInfo.version).toMatch(/^\d+\.\d+\.\d+/);
+    });
   });
 
   describe("Helper Functions", () => {
