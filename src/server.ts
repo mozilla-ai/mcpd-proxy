@@ -29,7 +29,7 @@ import {
   PipelineError,
 } from "@mozilla-ai/mcpd";
 import type { Config } from "./config.js";
-import pkg from "../package.json" with { type: "json" };
+import { version } from "../package.json" with { type: "json" };
 
 /**
  * Parse a prefixed name in the format "server__name" into its components.
@@ -295,7 +295,7 @@ export function createMcpServer(config: Config): Server {
   const server = new Server(
     {
       name: "mcpd-proxy",
-      version: pkg.version,
+      version,
     },
     {
       capabilities: {
@@ -316,7 +316,7 @@ export function createMcpServer(config: Config): Server {
       },
       serverInfo: {
         name: "mcpd-proxy",
-        version: pkg.version,
+        version,
       },
     };
   });
